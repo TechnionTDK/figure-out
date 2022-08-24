@@ -59,12 +59,6 @@
 </template>
 
 <script>
-// https://github.com/cyclecycle/vue-annotated-text
-// Currently not in use.
-// NOTE!! the import below didn't work, should use require as below
-// see https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
-//import AnnotatedText from "vue-annotated-text";
-//const annotations = require("vue-annotated-text");
 import axios from "axios";
 
 export default {
