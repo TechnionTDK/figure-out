@@ -1,87 +1,348 @@
 <template>
-  <v-container>
-    <v-row class="text-center">
+  <div id="main" class="ma-5">
+    <v-row>
       <v-col cols="8">
         <v-textarea
-          v-model="text"
+          v-model="input"
           clearable
           filled
           shaped
-          label="טקסט לזיהוי"
+          label="טקסט/ים לזיהוי"
           clear-icon="mdi-close-circle"
           no-resize
           rows="8"
         >
-        </v-textarea>
-        <v-btn class="primary" @click="sendText()"> זהה מטאפורות </v-btn>        
-        <div class="mt-5" v-html="annotatedText"></div>
+        </v-textarea> </v-col
+    ></v-row>
+    <v-row dense class="mt-n5" align="center">
+      <v-col cols="1">
+        <v-btn class="primary" @click="sendTexts()"> שלח </v-btn>
+      </v-col>
+      <v-col cols="2"> ({{ texts.length }} טקסטים זוהו) </v-col>
+    </v-row>
+    <!-- Present each text next to its annotated result. -->
+    <v-row v-for="(orig, index) in modelAnnotations" :key="index">
+      <v-col cols="5">
+        <v-card outlined color="#F5F5F5">
+          <v-card-title> תיוג מודל #{{ index + 1 }} </v-card-title>
+          <v-card-text
+            class="black--text"
+            v-html="annotateText(texts[index], orig, index, false)"
+          ></v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="5">
+        <v-card outlined color="#F5F5F5">
+          <v-card-title> תיוג משתמש #{{ index + 1 }} </v-card-title>
+          <v-card-text
+            :id="cardId(index)"
+            class="black--text"
+            v-html="annotateText(texts[index], userAnnotations[index], index)"
+          ></v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="2">
+        <div class="text-body-2 ml-10" style="text-align: left">
+          Model Recall: {{ getRecall(index) }}
+          <br />
+          Model Precision: {{ getPrecision(index) }}
+          <br />
+          TP: {{ getTruePositives(index) }}
+          <br />
+          FN: {{ getFalseNegatives(index) }}
+          <br />
+          FP: {{ getFalsePositives(index) }}
+        </div>
       </v-col>
     </v-row>
-  </v-container>
+  </div>
 </template>
 
 <script>
+// https://github.com/cyclecycle/vue-annotated-text
+// Currently not in use.
+// NOTE!! the import below didn't work, should use require as below
+// see https://stackoverflow.com/questions/41292559/could-not-find-a-declaration-file-for-module-module-name-path-to-module-nam
+//import AnnotatedText from "vue-annotated-text";
+//const annotations = require("vue-annotated-text");
 import axios from "axios";
 
 export default {
   name: "FindMetaphors",
-
   data() {
     return {
-      text: "",
-      result: [],
+      input: "", // user input is turn into separate texts (see computed.texts)
+      modelAnnotations: [],
+      userAnnotations: [], // ground truth, model annotationes are evaluated against them.
     };
   },
   computed: {
-    annotatedText() {
-      // return empty string if result is empty
-      if (this.result.length === 0) {
-        return "";
+    texts() {
+      // split user input into separate texts
+      if (this.input == "") {
+        return [];
       }
-      // split text based on spaces and new lines
-      // iterate each word in text. if word index is in result, add <span> tag with class "highlight", else return span tag with word as text
-      return this.text.split(/\s+|\n/).map((word, index) => {
-        if (this.isWordAnnotated(index)) {
-          return `<span class="yellow">${word}</span>`;
-        }
-        return `<span>${word}</span>`;
-      }).join(" ");
+      return this.input.trim().split(/\n{2,}/);
     },
   },
   watch: {
-    text(newText) {
-      // clear result if text is empty or null
-      if (!newText) {
-        this.text = "";
-        this.result = [];
+    input(newInput) {
+      // when user input changes, clear previous annotations
+      // clear annotations if input is empty or null
+      if (!newInput) {
+        this.input = "";
+        this.modelAnnotations = [];
+        this.userAnnotations = [];
       }
     },
   },
   methods: {
-    // use axios to send the text to the server
-    // and get the result back
-    // then update the textarea with the result
-    //
-    sendText() {
-      axios
-        .get("http://127.0.0.1:5000/detect", {
-          params: {
-            text: this.text,
-          },
-        })
-        .then((response) => {
-          this.result = response.data.result;
-        })
-        .catch((error) => {
-          console.log(error);
-        });
+    getRecall(textIndex) {
+      // calculates the recall of the model annotations compared to the user annotations (ground truth).
+      var tp = this.getTruePositives(textIndex);
+      var fn = this.getFalseNegatives(textIndex);
+
+      // recall = tp / (tp + fn)
+      if (tp + fn == 0) return 0;
+
+      return (tp / (tp + fn)).toFixed(2);
     },
-    isWordAnnotated(index) {
+    getTruePositives(textIndex) {
+      var tp = 0; // true positives: a word that is annotated by the model and also by the user.
+      // calc true positives
+      var annotations = this.modelAnnotations[textIndex];
+      for (var i = 0; i < annotations.length; i++) {
+        if (
+          this.userAnnotations[textIndex].some(
+            (e) => e.word_index === annotations[i].word_index
+          )
+        ) {
+          tp++;
+        }
+      }
+      return tp;
+    },
+    getFalseNegatives(textIndex) {
+      var fn = 0; // false negatives: not annotated by the model but annotated by the user.
+      // calc false negatives
+      var annotations = this.userAnnotations[textIndex];
+      for (var i = 0; i < annotations.length; i++) {
+        if (
+          !this.modelAnnotations[textIndex].some(
+            (e) => e.word_index === annotations[i].word_index
+          )
+        ) {
+          fn++;
+        }
+      }
+      return fn;
+    },
+    getFalsePositives(textIndex) {
+      var fp = 0; // false positives: annotated by the model but not annotated by the user.
+      // calc false positives
+      var annotations = this.modelAnnotations[textIndex];
+      for (var i = 0; i < annotations.length; i++) {
+        if (
+          !this.userAnnotations[textIndex].some(
+            (e) => e.word_index === annotations[i].word_index
+          )
+        ) {
+          fp++;
+        }
+      }
+      return fp;
+    },
+    getPrecision(textIndex) {
+      // calculates the precision of the model annotations compared to the user annotations (ground truth).
+      var tp = this.getTruePositives(textIndex);
+      var fp = this.getFalsePositives(textIndex);
+
+      // precision = tp / (tp + fp)
+      if (tp + fp == 0) return 0;
+
+      return (tp / (tp + fp)).toFixed(2);
+    },
+    cardId(index) {
+      return `card_${index}`;
+    },
+    // use axios to send the texts to the server for annotation
+    // and get the result back
+    sendTexts() {
+      this.modelAnnotations = [];
+      var tmpResult = new Array(this.texts.length);
+
+      // iterate each text in texts, and send it to the server,
+      // put each result in array based on index of document in documents
+      this.texts.forEach((text, index) => {
+        axios
+          .get("http://127.0.0.1:5000/detect", {
+            params: {
+              text: text,
+            },
+          })
+          .then((response) => {
+            tmpResult[index] = response.data.result;
+          })
+          .catch((error) => {
+            console.log(error);
+          });
+      });
+
+      // TODO: remove the timeouts and set a more stable solution.
+      // wait for all requests to be done, then update this.modelAnnotations
+      setTimeout(() => {
+        this.modelAnnotations = tmpResult;
+        // set userAnnotations with a clone of modelAnnotations
+        this.userAnnotations = JSON.parse(
+          JSON.stringify(this.modelAnnotations)
+        );
+      }, 1000);
+
+      // should wait for rebuild
+      setTimeout(() => {
+        // see https://stackoverflow.com/questions/56574059/how-to-find-index-of-selected-text-in-getselection-using-javascript
+        for (var i = 0; i < this.texts.length; i++) {
+          document
+            .getElementById(this.cardId(i))
+            .addEventListener("mouseup", function (e) {
+              var wordIndex = parseInt(e.path[0].id); // word index == span id
+              var textIndex = parseInt(e.path[1].id.split("_")[1]); // see cardId, we extract the number after the underscore
+              // console.log(wordIndex);
+              // console.log(textIndex);
+              var selection = window.getSelection();
+              var start = selection.anchorOffset;
+              var end = selection.focusOffset;
+              if (end != start) {
+                // i.e., not an empty selection (click a word)
+                addAnnotation(selection, wordIndex, start, end, textIndex);
+              }
+            });
+        }
+      }, 2000);
+    },
+    annotateText(content, annotations, annotationIndex, correct = true) {
+      // return empty string if result is empty
+      if (annotations.length === 0) {
+        return "לא זוהו תיוגים";
+      }
+      // replace each \n in current text with \n and space
+      let text = content.replace(/\n/g, "\n ");
+
+      // split text based on spaces
+      // iterate each word in text. if word index is in result,
+      // add <span> tag with a highlight, else return span tag with word as text
+      text = text
+        .split(" ")
+        .map((word, wordIndex) => {
+          var newline = word.endsWith("\n") ? "<br>" : "";
+          if (this.isWordAnnotated(annotations, wordIndex)) {
+            //return `<span class="yellow">${word}</span>`;
+            // https://www.w3schools.com/howto/howto_css_dropdown.asp
+            if (correct) {
+              // see created hook for explanation
+              // why return false? see https://stackoverflow.com/questions/2084750/javascript-anchor-avoid-scroll-to-top-on-click
+              // (that was a big headache)
+              var mySpan = `<div class="dropdown"><span id="${wordIndex}" class="dropbtn yellow">${word}</span><div class="dropdown-content"><a href="#" onclick="removeAnnotation(${wordIndex}, ${annotationIndex}); return false;">הסרה</a></div></div>${newline}`;
+              return mySpan;
+            } else {
+              return `<span id="${wordIndex}" class="yellow">${word}</span>${newline}`;
+            }
+          }
+          return `<span id="${wordIndex}">${word}</span>${newline}`;
+        })
+        .join(" ");
+
+      return text;
+    },
+    isWordAnnotated(annotations, index) {
       // return true if index is in one of result objects, in field word_index
-      return this.result.some((obj) => {
+      return annotations.some((obj) => {
         return obj.word_index === index;
       });
     },
+    removeAnnotation(wordIndex, annotationIndex) {
+      // remove annotation at wordIndex from userAnnotations[annotationIndex]
+      this.userAnnotations[annotationIndex] = this.userAnnotations[
+        annotationIndex
+      ].filter((obj) => {
+        return obj.word_index !== wordIndex;
+      });
+
+      // clone userAnnotations from its original state
+      // if we do not do this, state is not updated
+      this.userAnnotations = JSON.parse(JSON.stringify(this.userAnnotations));
+    },
+    addAnnotation(word, wordIndex, start, end, annotationIndex) {
+      this.userAnnotations[annotationIndex].push({
+        entity_group: "metaphor",
+        start: start,
+        end: end,
+        word: word,
+        word_index: wordIndex,
+      });
+
+      // here rebuild happens, no need to clone...
+    },
+  },
+  created() {
+    // see https://codehunter.cc/a/vue.js/how-to-access-a-vue-function-from-onclick-in-javascript
+    // struglled with this one, but it works
+    window.removeAnnotation = this.removeAnnotation;
+    window.addAnnotation = this.addAnnotation;
   },
 };
 </script>
+<style>
+.my-span-class:hover {
+  outline: 1px solid black;
+}
+.annotated {
+  font-weight: bold;
+}
+/* .dropbtn {
+  background-color: #04aa6d;
+  color: white;
+  padding: 16px;
+  font-size: 16px;
+  border: none;
+} */
+
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: white;
+  /* min-width: 160px; */
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+/* Links inside the dropdown */
+.dropdown-content a {
+  color: black;
+  padding: 3px 10px;
+  text-decoration: none;
+  display: block;
+}
+
+/* Change color of dropdown links on hover */
+.dropdown-content a:hover {
+  background-color: #f8f8f8;
+}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+/* Change the background color of the dropdown button when the dropdown content is shown */
+.dropdown:hover .dropbtn {
+  background-color: #3e8e41;
+}
+</style>

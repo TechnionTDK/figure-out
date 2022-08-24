@@ -1,9 +1,7 @@
 <template>
   <v-app>
     <v-app-bar app color="primary" dark dense>
-        <v-toolbar-title class="text-h5">
-          זיהוי לשון פיגורטיבית
-        </v-toolbar-title>
+      <v-toolbar-title class="text-h5"> זיהוי לשון פיגורטיבית </v-toolbar-title>
 
       <v-spacer></v-spacer>
 

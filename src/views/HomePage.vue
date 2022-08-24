@@ -1,5 +1,7 @@
 <template>
-  <FindMetaphors />
+  <div>
+    <FindMetaphors />
+  </div>
 </template>
 
 <script>
