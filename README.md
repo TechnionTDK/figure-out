@@ -1,4 +1,4 @@
-# figapp
+# Figure Out
 
 ## Project setup
 ```

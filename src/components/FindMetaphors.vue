@@ -1,7 +1,7 @@
 <template>
   <div id="main" class="ma-5">
     <v-row>
-      <v-col cols="8">
+      <v-col cols="7">
         <v-textarea
           v-model="input"
           clearable
@@ -16,7 +16,7 @@
     ></v-row>
     <v-row dense class="mt-n5" align="center">
       <v-col cols="1">
-        <v-btn class="primary" @click="sendTexts()"> שלח </v-btn>
+        <v-btn class="primary" @click="sendTexts()"> תייג </v-btn>
       </v-col>
       <v-col cols="2"> ({{ texts.length }} טקסטים זוהו) </v-col>
     </v-row>
@@ -42,10 +42,13 @@
         </v-card>
       </v-col>
       <v-col cols="2">
-        <div class="text-body-2 ml-10" style="text-align: left">
-          Model Recall: {{ getRecall(index) }}
+        <div
+          class="text-body-2 ml-10"
+          style="text-align: left; line-height: 17px"
+        >
+          Model Recall: {{ getRecall(index) * 100 }}
           <br />
-          Model Precision: {{ getPrecision(index) }}
+          Precision: {{ getPrecision(index) * 100 }}
           <br />
           TP: {{ getTruePositives(index) }}
           <br />
@@ -92,6 +95,8 @@ export default {
   },
   methods: {
     getRecall(textIndex) {
+      if (this.userAnnotations[textIndex].length == 0) return 1; // empty case
+
       // calculates the recall of the model annotations compared to the user annotations (ground truth).
       var tp = this.getTruePositives(textIndex);
       var fn = this.getFalseNegatives(textIndex);
@@ -152,7 +157,7 @@ export default {
       var fp = this.getFalsePositives(textIndex);
 
       // precision = tp / (tp + fp)
-      if (tp + fp == 0) return 0;
+      if (fp == 0) return 1;
 
       return (tp / (tp + fp)).toFixed(2);
     },
@@ -215,10 +220,6 @@ export default {
       }, 2000);
     },
     annotateText(content, annotations, annotationIndex, correct = true) {
-      // return empty string if result is empty
-      if (annotations.length === 0) {
-        return "לא זוהו תיוגים";
-      }
       // replace each \n in current text with \n and space
       let text = content.replace(/\n/g, "\n ");
 
@@ -280,7 +281,7 @@ export default {
   },
   created() {
     // see https://codehunter.cc/a/vue.js/how-to-access-a-vue-function-from-onclick-in-javascript
-    // struglled with this one, but it works
+    // struglled with this one, but it now works :(
     window.removeAnnotation = this.removeAnnotation;
     window.addAnnotation = this.addAnnotation;
   },

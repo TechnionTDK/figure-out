@@ -1,12 +1,15 @@
 <template>
   <v-app>
     <v-app-bar app color="primary" dark dense>
-      <v-toolbar-title class="text-h5"> זיהוי לשון פיגורטיבית </v-toolbar-title>
+      <v-toolbar-title class="text-h5 mr-3"
+        ><span class="font-weight-light">FIGURE</span
+        ><span class="font-weight-thin">OUT</span></v-toolbar-title
+      >
 
       <v-spacer></v-spacer>
 
       <v-btn
-        href="https://github.com/vuetifyjs/vuetify/releases/latest"
+        href="https://github.com/TechnionTDK/figure-out"
         target="_blank"
         text
       >
