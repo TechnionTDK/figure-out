@@ -11,12 +11,13 @@
           clear-icon="mdi-close-circle"
           no-resize
           rows="8"
+          hide-details
         >
         </v-textarea> </v-col
     ></v-row>
-    <v-row dense class="mt-n5" align="center">
+    <v-row dense class="mt-2" align="center">
       <v-col cols="1">
-        <v-btn class="primary" @click="sendTexts()"> תייג </v-btn>
+        <v-btn class="primary" @click="sendTexts()"> תיוג </v-btn>
       </v-col>
       <v-col cols="2"> ({{ texts.length }} טקסטים זוהו) </v-col>
     </v-row>
@@ -63,6 +64,7 @@
 
 <script>
 import axios from "axios";
+import { flaskAddr } from '@/flask_addr'
 
 export default {
   name: "FindMetaphors",
@@ -174,7 +176,7 @@ export default {
       // put each result in array based on index of document in documents
       this.texts.forEach((text, index) => {
         axios
-          .get("http://127.0.0.1:5000/detect", {
+          .get(flaskAddr + "detect", {
             params: {
               text: text,
             },
