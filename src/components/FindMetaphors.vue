@@ -13,8 +13,48 @@
           rows="8"
           hide-details
         >
-        </v-textarea> </v-col
-    ></v-row>
+        </v-textarea>
+      </v-col>
+      <v-col cols="4">
+        <div class="mt-4">
+          <v-slider
+            v-model="score"
+            :min="0"
+            :max="1"
+            :step="0.1"
+            thumb-label="always"
+            :thumb-size="25"
+            label="רמת דיוק"
+            hide-details
+          ></v-slider>
+          <!-- <div class="text-caption">מציג 100% מהתיוגים.</div> -->
+          <!-- Add a button to download JSON file from the data -->
+          <v-row dense>
+            <v-col cols="7">
+              <v-btn
+                class="mt-3 primary"
+                @click="downloadJSON()"
+                :disabled="modelAnnotations.length == 0"
+              >
+                הורדת תיוגים כקובץ JSON
+              </v-btn>
+            </v-col>
+            <!-- Add a textfield for corpus name -->
+            <v-col cols="5">
+              <v-text-field
+                v-model="corpus_name"
+                filled
+                dense
+                shaped
+                label="שם הקורפוס"
+                hide-details
+                :disabled="modelAnnotations.length == 0"
+              ></v-text-field>
+            </v-col>
+          </v-row>
+        </div>
+      </v-col>
+    </v-row>
     <v-row dense class="mt-2" align="center">
       <v-col cols="1">
         <v-btn class="primary" @click="sendTexts()"> תיוג </v-btn>
@@ -26,20 +66,21 @@
       <v-col cols="5">
         <v-card outlined color="#F5F5F5">
           <v-card-title> תיוג מודל #{{ index + 1 }} </v-card-title>
-          <v-card-text
-            class="black--text"
-            v-html="annotateText(texts[index], orig, index, false)"
-          ></v-card-text>
+          <v-card-text class="black--text">
+            <span
+              v-html="annotateText(texts[index], orig, index, false)"
+            ></span>
+          </v-card-text>
         </v-card>
       </v-col>
       <v-col cols="5">
         <v-card outlined color="#F5F5F5">
           <v-card-title> תיוג משתמש #{{ index + 1 }} </v-card-title>
-          <v-card-text
-            :id="cardId(index)"
-            class="black--text"
-            v-html="annotateText(texts[index], userAnnotations[index], index)"
-          ></v-card-text>
+          <v-card-text :id="cardId(index)" class="black--text">
+            <span
+              v-html="annotateText(texts[index], userAnnotations[index], index)"
+            ></span>
+          </v-card-text>
         </v-card>
       </v-col>
       <v-col cols="2">
@@ -64,20 +105,23 @@
 
 <script>
 import axios from "axios";
-import { flaskAddr } from '@/flask_addr'
+import { flaskAddr } from "@/flask_addr";
 
 export default {
   name: "FindMetaphors",
   data() {
     return {
-      input: "", // user input is turn into separate texts (see computed.texts)
+      input: "", // user input is turned into separate texts (see computed.texts)
       modelAnnotations: [],
       userAnnotations: [], // ground truth, model annotationes are evaluated against them.
+      score: 0.3, // threshold for annotations' score
+      corpus_name: "no_name",
     };
   },
   computed: {
     texts() {
       // split user input into separate texts
+      // a line break separates between texts (actually, two line breaks)
       if (this.input == "") {
         return [];
       }
@@ -92,10 +136,91 @@ export default {
         this.input = "";
         this.modelAnnotations = [];
         this.userAnnotations = [];
+        this.corpus_name = "no_name";
       }
     },
   },
   methods: {
+    downloadJSON() {
+      // download the texts and annotations as a JSON file
+      var data = {
+        corpus: {
+          name: this.corpus_name,
+          data: {
+            texts: [],
+          },
+        },
+      };
+
+      // iterate each text in texts, and add it to the JSON
+      this.texts.forEach((text, index) => {
+        data.corpus.data.texts.push({
+          name: `text${index + 1}`,
+          full_text: text,
+        });
+      });
+
+      // add a "tags" array with a single object {name: "metaphor"}
+      data.corpus.data.tags = [{ name: "metaphor" }];
+
+      // add an "annotations" array with all the annotations.
+      // each object in the array has the following keys:
+      // - "text_name" with the text name (e.g., "text1")
+      // - "tag" : "metaphor"
+      // - "start" : start index of the annotation
+      // - "end" : end index of the annotation
+      // - "user": "user" | "model"
+      // start generating the JSON
+      data.corpus.data.annotations = [];
+      this.modelAnnotations.forEach((annotations, i) => {
+        // iterate each annotation in annotations, and add it to the JSON
+        annotations.forEach((annotation, j) => {
+          // add the annotation to the JSON
+          data.corpus.data.annotations.push({
+            text_name: `text${i + 1}`,
+            tag: "metaphor",
+            start: annotation.start,
+            end: annotation.end,
+            user: "Model",
+          });
+        });
+      });
+      this.userAnnotations.forEach((annotations, i) => {
+        // iterate each annotation in annotations, and add it to the JSON
+        annotations.forEach((annotation, j) => {
+          // add the annotation to the JSON
+          data.corpus.data.annotations.push({
+            text_name: `text${i + 1}`,
+            tag: "metaphor",
+            start: annotation.start,
+            end: annotation.end,
+            user: "User",
+          });
+        });
+      });
+
+      // stringify and indent the JSON
+      var jsonStr = JSON.stringify(data, null, 2);
+
+      // download the JSON file with the name corpus_name.json
+      this.download(`${this.corpus_name}.json`, jsonStr);
+    },
+    // from https://stackoverflow.com/questions/3665115/how-to-create-a-file-in-memory-for-user-to-download-but-not-through-server
+    download(filename, text) {
+      var element = document.createElement("a");
+      element.setAttribute(
+        "href",
+        "data:text/plain;charset=utf-8," + encodeURIComponent(text)
+      );
+      element.setAttribute("download", filename);
+
+      element.style.display = "none";
+      document.body.appendChild(element);
+
+      element.click();
+
+      document.body.removeChild(element);
+    },
     getRecall(textIndex) {
       if (this.userAnnotations[textIndex].length == 0) return 1; // empty case
 
@@ -170,10 +295,11 @@ export default {
     // and get the result back
     sendTexts() {
       this.modelAnnotations = [];
+      this.userAnnotations = [];
       var tmpResult = new Array(this.texts.length);
 
       // iterate each text in texts, and send it to the server,
-      // put each result in array based on index of document in documents
+      // put each result in tmpResult in the same index as the text
       this.texts.forEach((text, index) => {
         axios
           .get(flaskAddr + "detect", {
@@ -188,6 +314,8 @@ export default {
             console.log(error);
           });
       });
+
+      // wait until tmpResult is full
 
       // TODO: remove the timeouts and set a more stable solution.
       // wait for all requests to be done, then update this.modelAnnotations
@@ -206,8 +334,10 @@ export default {
           document
             .getElementById(this.cardId(i))
             .addEventListener("mouseup", function (e) {
-              var wordIndex = parseInt(e.path[0].id); // word index == span id
-              var textIndex = parseInt(e.path[1].id.split("_")[1]); // see cardId, we extract the number after the underscore
+              // see https://stackoverflow.com/questions/36845515/mouseevent-path-equivalent-in-firefox-safari
+              // (why we use composedPath() instead of path. path didn't work in chrome as well)
+              var wordIndex = parseInt(e.composedPath()[0].id); // word index == span id
+              var textIndex = parseInt(e.composedPath()[1].id.split("_")[1]); // see cardId, we extract the number after the underscore
               // console.log(wordIndex);
               // console.log(textIndex);
               var selection = window.getSelection();
@@ -254,7 +384,7 @@ export default {
     isWordAnnotated(annotations, index) {
       // return true if index is in one of result objects, in field word_index
       return annotations.some((obj) => {
-        return obj.word_index === index;
+        return obj.word_index === index && obj.score >= this.score;
       });
     },
     removeAnnotation(wordIndex, annotationIndex) {

@@ -14,7 +14,7 @@ app.config.from_object(__name__)
 CORS(app, resources={r'/*': {'origins': '*'}})
 
 model = pipeline("ner", grouped_entities=True,
-                 model="tokeron/alephbert-finetuned-metaphor-detection")
+                 model="tokeron/BEREL_Piyyut")
 
 
 @app.route('/detect', methods=['GET'])
@@ -25,8 +25,10 @@ def detect():
 
     res = model(text)
 
-    # remove from res its elements with key "score" (float cannot be jsonified)
-    res = [{k: v for k, v in r.items() if k != "score"} for r in res]
+    # for each key "score" in res, cast its value to string (float cannot be jsonified)
+    for r in res:
+        r["score"] = str(r["score"])
+
     res = add_word_index(res, text)
     # add res to response_object
     response_object["result"] = res
