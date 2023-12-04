@@ -1,13 +1,14 @@
 <template>
   <div id="main" class="ma-5">
     <v-row>
+      <!-- Text input area -->
       <v-col cols="7">
         <v-textarea
           v-model="input"
           clearable
           filled
           shaped
-          label="טקסט/ים לזיהוי"
+          label="הזינו טקסטים לזיהוי מטפורות. שלוש כוכביות *** מפרידות בין טקסטים שונים."
           clear-icon="mdi-close-circle"
           no-resize
           rows="8"
@@ -15,43 +16,71 @@
         >
         </v-textarea>
       </v-col>
+      <!-- Options: Export to JSON, Score slider -->
       <v-col cols="4">
-        <div class="mt-4">
+        <div>
+          <!-- Load ground-truth text from piyyut corpus -->
+          <v-row dense>
+            <v-col cols="10">
+              <v-select
+                v-model="selectedPiyyutTexts"
+                :items="allPiyyutTexts"
+                label="בחירת טקסטים מתוך קורפוס פיוט"
+                multiple
+                clearable
+                hide-details
+              ></v-select>
+            </v-col>
+            <v-col cols="2">
+              <v-btn
+                class="mt-3 primary"
+                @click="loadPiyyutTexts()"
+                :disabled="selectedPiyyutTexts.length == 0"
+              >
+                טען
+              </v-btn>
+            </v-col>
+          </v-row>
+          <!-- Download as JSON -->
+          <v-row dense class="mt-5">
+            <v-col cols="5">
+              <v-btn
+                class="mt-3 primary"
+                @click="downloadJSON()"
+                :disabled="modelAnnotations.length == 0"
+              >
+                הורד כקובץ JSON
+              </v-btn>
+            </v-col>
+            <!-- Add a textfield for corpus name -->
+            <v-col cols="5">
+              <v-text-field
+                v-model="corpusName"
+                filled
+                dense
+                shaped
+                label="שם הקורפוס להורדה"
+                hide-details
+                :disabled="modelAnnotations.length == 0"
+              ></v-text-field>
+            </v-col>
+          </v-row>
           <v-slider
+            v-show="modelAnnotations.length > 0"
+            class="mt-10"
             v-model="score"
             :min="0"
             :max="1"
             :step="0.1"
             thumb-label="always"
             :thumb-size="25"
-            label="רמת דיוק"
+            label="הצג תיוגים מעל ניקוד:"
             hide-details
           ></v-slider>
-          <!-- <div class="text-caption">מציג 100% מהתיוגים.</div> -->
-          <!-- Add a button to download JSON file from the data -->
-          <v-row dense>
-            <v-col cols="7">
-              <v-btn
-                class="mt-3 primary"
-                @click="downloadJSON()"
-                :disabled="modelAnnotations.length == 0"
-              >
-                הורדת תיוגים כקובץ JSON
-              </v-btn>
-            </v-col>
-            <!-- Add a textfield for corpus name -->
-            <v-col cols="5">
-              <v-text-field
-                v-model="corpus_name"
-                filled
-                dense
-                shaped
-                label="שם הקורפוס"
-                hide-details
-                :disabled="modelAnnotations.length == 0"
-              ></v-text-field>
-            </v-col>
-          </v-row>
+          <span v-show="modelAnnotations.length > 0" class="primary--text"
+            >ממוצע תיוגים מוצגים:
+            {{ getAveragePercentageOfAnnotationsShown() }}%</span
+          >
         </div>
       </v-col>
     </v-row>
@@ -85,18 +114,23 @@
       </v-col>
       <v-col cols="2">
         <div
-          class="text-body-2 ml-10"
+          class="text-caption ml-10"
           style="text-align: left; line-height: 17px"
         >
-          Model Recall: {{ getRecall(index) * 100 }}
+          <span dir="ltr">Model Recall: {{ getRecall(index) * 100 }}</span>
           <br />
-          Precision: {{ getPrecision(index) * 100 }}
+          <span dir="ltr">Precision: {{ getPrecision(index) * 100 }}</span>
           <br />
-          TP: {{ getTruePositives(index) }}
+          <span dir="ltr">TP: {{ getTruePositives(index) }}</span>
           <br />
-          FN: {{ getFalseNegatives(index) }}
+          <span dir="ltr">FN: {{ getFalseNegatives(index) }}</span>
           <br />
-          FP: {{ getFalsePositives(index) }}
+          <span dir="ltr">FP: {{ getFalsePositives(index) }}</span>
+          <br />
+          <span dir="ltr"
+            >Annotations shown:
+            {{ getPercentageOfAnnotationsShown(index).toFixed(2) }}%</span
+          >
         </div>
       </v-col>
     </v-row>
@@ -114,18 +148,28 @@ export default {
       input: "", // user input is turned into separate texts (see computed.texts)
       modelAnnotations: [],
       userAnnotations: [], // ground truth, model annotationes are evaluated against them.
+      groundTruthAnnotations: [],
       score: 0.3, // threshold for annotations' score
-      corpus_name: "no_name",
+      corpusName: "no_name",
+      selectedPiyyutTexts: [],
+      allPiyyutTexts: [],
     };
   },
   computed: {
     texts() {
       // split user input into separate texts
-      // a line break separates between texts (actually, two line breaks)
+      // three asterisks separate between texts
       if (this.input == "") {
         return [];
       }
-      return this.input.trim().split(/\n{2,}/);
+      //return this.input.trim().split(/\n{2,}/);
+
+
+      // trim and split by three asterisks ***
+      var texts = this.input.trim().split("***");
+      // trim each text
+      texts = texts.map((text) => text.trim());
+      return texts;
     },
   },
   watch: {
@@ -136,16 +180,50 @@ export default {
         this.input = "";
         this.modelAnnotations = [];
         this.userAnnotations = [];
-        this.corpus_name = "no_name";
+        this.corpusName = "no_name";
       }
     },
   },
   methods: {
+    loadPiyyutTexts() {
+      // load the selected piyyut texts into the input
+      // call the server with piyyutim/names=selectedPiyyutTexts (seperated with commas)
+      axios
+        .get(flaskAddr + "piyyutim?names=" + this.selectedPiyyutTexts.join(","))
+        .then((response) => {
+          // extract result from response.data (a list of objects)
+          var result = response.data.result;
+
+          // iterate each object in result, and extract text.fulltext
+          // then join them with "\n***\n"
+          this.input = result.map((obj) => obj.text.fulltext).join("\n***\n");
+
+          // get the annotations of each object in result
+          // and set them as the ground truth annotations
+          // with the fields: start, end, word_index
+          this.groundTruthAnnotations = result.map((obj) => {
+            return obj.annotations.map((annotation) => {
+              return {
+                start: annotation.start,
+                end: annotation.end,
+                word_index: annotation.word_index,
+                entity_group:"metaphor",
+                score: 1,
+              };
+            });
+          });
+
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+
+    },
     downloadJSON() {
       // download the texts and annotations as a JSON file
       var data = {
         corpus: {
-          name: this.corpus_name,
+          name: this.corpusName,
           data: {
             texts: [],
           },
@@ -202,8 +280,8 @@ export default {
       // stringify and indent the JSON
       var jsonStr = JSON.stringify(data, null, 2);
 
-      // download the JSON file with the name corpus_name.json
-      this.download(`${this.corpus_name}.json`, jsonStr);
+      // download the JSON file with the name corpusName.json
+      this.download(`${this.corpusName}.json`, jsonStr);
     },
     // from https://stackoverflow.com/questions/3665115/how-to-create-a-file-in-memory-for-user-to-download-but-not-through-server
     download(filename, text) {
@@ -220,6 +298,17 @@ export default {
       element.click();
 
       document.body.removeChild(element);
+    },
+    readAllPiyyutTexts() {
+      // read from server all "piyyutim", set the result in allPiyyutTexts
+      axios
+        .get(flaskAddr + "piyyutim")
+        .then((response) => {
+          this.allPiyyutTexts = response.data.result;
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     },
     getRecall(textIndex) {
       if (this.userAnnotations[textIndex].length == 0) return 1; // empty case
@@ -288,6 +377,27 @@ export default {
 
       return (tp / (tp + fp)).toFixed(2);
     },
+    getPercentageOfAnnotationsShown(textIndex) {
+      // calculates the percentage of annotations shown (those with score >= this.score)
+      var annotations = this.modelAnnotations[textIndex];
+      var count = 0;
+      for (var i = 0; i < annotations.length; i++) {
+        if (annotations[i].score >= this.score) {
+          count++;
+        }
+      }
+      //return ((count / annotations.length) * 100).toFixed(2);
+      return (count / annotations.length) * 100;
+    },
+    getAveragePercentageOfAnnotationsShown() {
+      // calculates the average percentage of annotations shown (those with score >= this.score)
+      var total = 0;
+      for (var i = 0; i < this.modelAnnotations.length; i++) {
+        //total += parseFloat(this.getPercentageOfAnnotationsShown(i));
+        total += this.getPercentageOfAnnotationsShown(i);
+      }
+      return (total / this.modelAnnotations.length).toFixed(2);
+    },
     cardId(index) {
       return `card_${index}`;
     },
@@ -321,10 +431,18 @@ export default {
       // wait for all requests to be done, then update this.modelAnnotations
       setTimeout(() => {
         this.modelAnnotations = tmpResult;
-        // set userAnnotations with a clone of modelAnnotations
-        this.userAnnotations = JSON.parse(
-          JSON.stringify(this.modelAnnotations)
-        );
+
+        // if ground truth annotations are not empty, set userAnnotations with a clone of groundTruthAnnotations
+        if (this.groundTruthAnnotations.length > 0) {
+          this.userAnnotations = JSON.parse(
+            JSON.stringify(this.groundTruthAnnotations)
+          );
+        } else {
+          // else, set userAnnotations with a clone of modelAnnotations
+          this.userAnnotations = JSON.parse(
+            JSON.stringify(this.modelAnnotations)
+          );
+        }
       }, 1000);
 
       // should wait for rebuild
@@ -338,8 +456,6 @@ export default {
               // (why we use composedPath() instead of path. path didn't work in chrome as well)
               var wordIndex = parseInt(e.composedPath()[0].id); // word index == span id
               var textIndex = parseInt(e.composedPath()[1].id.split("_")[1]); // see cardId, we extract the number after the underscore
-              // console.log(wordIndex);
-              // console.log(textIndex);
               var selection = window.getSelection();
               var start = selection.anchorOffset;
               var end = selection.focusOffset;
@@ -416,6 +532,9 @@ export default {
     // struglled with this one, but it now works :(
     window.removeAnnotation = this.removeAnnotation;
     window.addAnnotation = this.addAnnotation;
+  },
+  mounted() {
+    this.readAllPiyyutTexts();
   },
 };
 </script>
