@@ -144,4 +144,4 @@ if __name__ == '__main__':
     port = int(os.getenv('VUE_APP_FLASK_SERVER_PORT', 5000))  # Use 5000 as default if FLASK_SERVER_PORT is not set
     print("VUE_APP_FLASK_SERVER_PORT from .env: " + str(os.getenv('VUE_APP_FLASK_SERVER_PORT')))
     print("Starting server on port " + str(port))
-    app.run(port=port)
+    app.run(host='0.0.0.0', port=port)
