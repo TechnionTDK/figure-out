@@ -3,17 +3,9 @@
     <v-row>
       <!-- Text input area -->
       <v-col cols="7">
-        <v-textarea
-          v-model="input"
-          clearable
-          filled
-          shaped
-          label="הזינו טקסטים לזיהוי מטפורות. שלוש כוכביות *** מפרידות בין טקסטים שונים."
-          clear-icon="mdi-close-circle"
-          no-resize
-          rows="8"
-          hide-details
-        >
+        <v-textarea v-model="input" clearable filled shaped
+          label="הזינו טקסט לזיהוי מטפורות. הפרידו בין מספר טקסטים באמצעות שלוש כוכביות (***)."
+          clear-icon="mdi-close-circle" no-resize rows="8" hide-details>
         </v-textarea>
       </v-col>
       <!-- Options: Export to JSON, Score slider -->
@@ -22,21 +14,11 @@
           <!-- Load ground-truth text from piyyut corpus -->
           <v-row dense>
             <v-col cols="10">
-              <v-select
-                v-model="selectedPiyyutTexts"
-                :items="allPiyyutTexts"
-                label="בחירת טקסטים מתוך קורפוס פיוט"
-                multiple
-                clearable
-                hide-details
-              ></v-select>
+              <v-select v-model="selectedPiyyutTexts" :items="allPiyyutTexts" label="בחירת טקסטים מתוך קורפוס פיוט"
+                multiple clearable hide-details></v-select>
             </v-col>
             <v-col cols="2">
-              <v-btn
-                class="mt-3 primary"
-                @click="loadPiyyutTexts()"
-                :disabled="selectedPiyyutTexts.length == 0"
-              >
+              <v-btn class="mt-3 primary" @click="loadPiyyutTexts()" :disabled="selectedPiyyutTexts.length == 0">
                 טען
               </v-btn>
             </v-col>
@@ -44,43 +26,20 @@
           <!-- Download as JSON -->
           <v-row dense class="mt-5">
             <v-col cols="5">
-              <v-btn
-                class="mt-3 primary"
-                @click="downloadJSON()"
-                :disabled="modelAnnotations.length == 0"
-              >
+              <v-btn class="mt-3 primary" @click="downloadJSON()" :disabled="modelAnnotations.length == 0">
                 הורד כקובץ JSON
               </v-btn>
             </v-col>
             <!-- Add a textfield for corpus name -->
             <v-col cols="5">
-              <v-text-field
-                v-model="corpusName"
-                filled
-                dense
-                shaped
-                label="שם הקורפוס להורדה"
-                hide-details
-                :disabled="modelAnnotations.length == 0"
-              ></v-text-field>
+              <v-text-field v-model="corpusName" filled dense shaped label="שם הקורפוס להורדה" hide-details
+                :disabled="modelAnnotations.length == 0"></v-text-field>
             </v-col>
           </v-row>
-          <v-slider
-            v-show="modelAnnotations.length > 0"
-            class="mt-10"
-            v-model="score"
-            :min="0"
-            :max="1"
-            :step="0.1"
-            thumb-label="always"
-            :thumb-size="25"
-            label="הצג תיוגים מעל ניקוד:"
-            hide-details
-          ></v-slider>
-          <span v-show="modelAnnotations.length > 0" class="primary--text"
-            >ממוצע תיוגים מוצגים:
-            {{ getAveragePercentageOfAnnotationsShown() }}%</span
-          >
+          <v-slider v-show="modelAnnotations.length > 0" class="mt-10" v-model="score" :min="0" :max="1" :step="0.1"
+            thumb-label="always" :thumb-size="25" label="הצג תיוגים מעל ניקוד:" hide-details></v-slider>
+          <span v-show="modelAnnotations.length > 0" class="primary--text">ממוצע תיוגים מוצגים:
+            {{ getAveragePercentageOfAnnotationsShown() }}%</span>
         </div>
       </v-col>
     </v-row>
@@ -96,41 +55,32 @@
         <v-card outlined color="#F5F5F5">
           <v-card-title> תיוג מודל #{{ index + 1 }} </v-card-title>
           <v-card-text class="black--text">
-            <span
-              v-html="annotateText(texts[index], orig, index, false)"
-            ></span>
+            <span v-html="annotateText(texts[index], orig, index, false)"></span>
           </v-card-text>
         </v-card>
       </v-col>
       <v-col cols="5">
         <v-card outlined color="#F5F5F5">
-          <v-card-title> תיוג משתמש #{{ index + 1 }} </v-card-title>
+          <v-card-title> תיקוני משתמש #{{ index + 1 }} </v-card-title>
           <v-card-text :id="cardId(index)" class="black--text">
-            <span
-              v-html="annotateText(texts[index], userAnnotations[index], index)"
-            ></span>
+            <span v-html="annotateText(texts[index], userAnnotations[index], index)"></span>
           </v-card-text>
         </v-card>
       </v-col>
       <v-col cols="2">
-        <div
-          class="text-caption ml-10"
-          style="text-align: left; line-height: 17px"
-        >
-          <span dir="ltr">Model Recall: {{ getRecall(index) * 100 }}</span>
+        <div class="text-caption ml-10" style="text-align: left; line-height: 17px">
+          <span dir="ltr"><b>Model Recall</b>: {{ getRecall(index) * 100 }}</span>
           <br />
-          <span dir="ltr">Precision: {{ getPrecision(index) * 100 }}</span>
+          <span dir="ltr"><b>Precision</b>: {{ getPrecision(index) * 100 }}</span>
           <br />
-          <span dir="ltr">TP: {{ getTruePositives(index) }}</span>
+          <span dir="ltr"><b>TP</b>: {{ getTruePositives(index) }}</span>
           <br />
-          <span dir="ltr">FN: {{ getFalseNegatives(index) }}</span>
+          <span dir="ltr"><b>FN</b>: {{ getFalseNegatives(index) }}</span>
           <br />
-          <span dir="ltr">FP: {{ getFalsePositives(index) }}</span>
+          <span dir="ltr"><b>FP</b>: {{ getFalsePositives(index) }}</span>
           <br />
-          <span dir="ltr"
-            >Annotations shown:
-            {{ getPercentageOfAnnotationsShown(index).toFixed(2) }}%</span
-          >
+          <span dir="ltr"><b>Annotations shown</b>:
+            {{ getPercentageOfAnnotationsShown(index).toFixed(2) }}%</span>
         </div>
       </v-col>
     </v-row>
@@ -207,7 +157,7 @@ export default {
                 start: annotation.start,
                 end: annotation.end,
                 word_index: annotation.word_index,
-                entity_group:"metaphor",
+                entity_group: "metaphor",
                 score: 1,
               };
             });
@@ -454,14 +404,17 @@ export default {
             .addEventListener("mouseup", function (e) {
               // see https://stackoverflow.com/questions/36845515/mouseevent-path-equivalent-in-firefox-safari
               // (why we use composedPath() instead of path. path didn't work in chrome as well)
-              var wordIndex = parseInt(e.composedPath()[0].id); // word index == span id
-              var textIndex = parseInt(e.composedPath()[1].id.split("_")[1]); // see cardId, we extract the number after the underscore
+              var composedPath = e.composedPath();
+              var wordIndex = parseInt(composedPath[0].id); // word index == span id
+              var parentElement = composedPath[2];
+              var parentId = parentElement.id;
+              var textIndex = parseInt(parentId.split("_")[1]); // see cardId, we extract the number after the underscore
               var selection = window.getSelection();
               var start = selection.anchorOffset;
               var end = selection.focusOffset;
               if (end != start) {
                 // i.e., not an empty selection (click a word)
-                addAnnotation(selection, wordIndex, start, end, textIndex);
+                addAnnotation(wordIndex, start, end, textIndex);
               }
             });
         }
@@ -515,12 +468,12 @@ export default {
       // if we do not do this, state is not updated
       this.userAnnotations = JSON.parse(JSON.stringify(this.userAnnotations));
     },
-    addAnnotation(word, wordIndex, start, end, annotationIndex) {
+    addAnnotation(wordIndex, start, end, annotationIndex) {
       this.userAnnotations[annotationIndex].push({
         entity_group: "metaphor",
         start: start,
         end: end,
-        word: word,
+        score: 1,
         word_index: wordIndex,
       });
 
@@ -542,9 +495,11 @@ export default {
 .my-span-class:hover {
   outline: 1px solid black;
 }
+
 .annotated {
   font-weight: bold;
 }
+
 /* .dropbtn {
   background-color: #04aa6d;
   color: white;

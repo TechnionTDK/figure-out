@@ -13,7 +13,7 @@
         target="_blank"
         text
       >
-        <span class="mr-2">אודות הפרויקט</span>
+        <span class="mr-2">GitHub</span>
         <v-icon>mdi-open-in-new</v-icon>
       </v-btn>
     </v-app-bar>
